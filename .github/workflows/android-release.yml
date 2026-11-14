@@ -36,17 +36,34 @@ jobs:
 
       - name: Build APK (assembleDebug)
         run: |
-          ./gradlew assembleDebug -x test --no-daemon --stacktrace 2>&1 | tee build.log
+          ./gradlew assembleDebug -x test -x testDebugUnitTest -x lint --no-daemon 2>&1 | tee build.log
         continue-on-error: true
 
       - name: Verify Build Output
         run: |
           APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
-            echo "::error title=Gradle Build Failed::APK not found. Dumping last 80 lines of build.log:"
-            while IFS= read -r line; do
+            echo "::error title=Gradle Build Failed::APK not found."
+            
+            # Print What went wrong section
+            if grep -q "What went wrong:" build.log; then
+              grep -A 35 "What went wrong:" build.log | while IFS= read -r line; do
+                echo "::error::$line"
+              done
+            fi
+            
+            # Print Kotlin compiler errors if any
+            if grep -q "^e: " build.log; then
+              grep "^e: " build.log | head -n 30 | while IFS= read -r line; do
+                echo "::error::$line"
+              done
+            fi
+
+            # Also dump last 30 lines of build log
+            echo "--- Last 30 lines of build.log ---"
+            tail -n 30 build.log | while IFS= read -r line; do
               echo "::error::$line"
-            done < <(tail -n 80 build.log)
+            done
             exit 1
           fi
 
