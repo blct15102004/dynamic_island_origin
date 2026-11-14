@@ -36,7 +36,7 @@ jobs:
 
       - name: Build APK (assembleDebug)
         run: |
-          ./gradlew assembleDebug -x test -x testDebugUnitTest -x lint --no-daemon 2>&1 | tee build.log
+          ./gradlew assembleDebug -x test -x testDebugUnitTest -x lint --no-daemon --info 2>&1 | tee build.log
         continue-on-error: true
 
       - name: Verify Build Output
@@ -44,24 +44,25 @@ jobs:
           APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
             echo "::error title=Gradle Build Failed::APK not found."
-            
-            # Print What went wrong section
-            if grep -q "What went wrong:" build.log; then
-              grep -A 35 "What went wrong:" build.log | while IFS= read -r line; do
-                echo "::error::$line"
-              done
-            fi
-            
-            # Print Kotlin compiler errors if any
-            if grep -q "^e: " build.log; then
-              grep "^e: " build.log | head -n 30 | while IFS= read -r line; do
-                echo "::error::$line"
-              done
-            fi
 
-            # Also dump last 30 lines of build log
-            echo "--- Last 30 lines of build.log ---"
-            tail -n 30 build.log | while IFS= read -r line; do
+            # Strip ANSI color codes for clean parsing
+            sed 's/\x1B\[[0-9;]*m//g' build.log > build_clean.log
+
+            # Print Kotlin compiler errors (various formats)
+            echo "=== Kotlin/Compiler Errors ==="
+            grep -E "^(e:|error:|\s*\^|.*\.kt:[0-9]+:[0-9]+: error)" build_clean.log | head -n 50 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+
+            # Print What went wrong section
+            echo "=== What Went Wrong ==="
+            grep -A 20 "What went wrong:" build_clean.log | head -n 25 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+
+            # Dump last 60 lines of build log
+            echo "=== Last 60 lines ==="
+            tail -n 60 build_clean.log | while IFS= read -r line; do
               echo "::error::$line"
             done
             exit 1
