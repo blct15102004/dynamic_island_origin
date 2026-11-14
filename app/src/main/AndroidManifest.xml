@@ -9,9 +9,6 @@
     <!-- Notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Overlay Fallback (System Alert Window) -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <!-- Bluetooth Monitoring -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
@@ -23,7 +20,6 @@
     <!-- Background Services & Battery -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -43,11 +39,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.IsleBridge">
-
-        <!-- Required for foregroundServiceType=specialUse on Android 14+ -->
-        <property
-            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-            android:value="overlay_island_fallback" />
 
         <!-- Main Activity -->
         <activity
@@ -84,12 +75,6 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
-
-        <!-- Fallback Overlay Foreground Service -->
-        <service
-            android:name=".core.overlay.OverlayService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse" />
 
         <!-- Shizuku Provider -->
         <provider

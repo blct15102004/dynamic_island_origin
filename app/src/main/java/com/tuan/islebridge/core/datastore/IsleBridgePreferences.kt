@@ -2,7 +2,6 @@ package com.tuan.islebridge.core.datastore
 
 data class IsleBridgePreferences(
     val isIslandEnabled: Boolean = true,
-    val isOverlayFallbackEnabled: Boolean = false,
     val forceNativeIsland: Boolean = false,
     val isNotificationMirroringEnabled: Boolean = true,
     val isBluetoothMonitoringEnabled: Boolean = true,
@@ -25,4 +24,3 @@ data class IsleBridgePreferences(
         "com.mservice.momotransfer"
     )
 )
-

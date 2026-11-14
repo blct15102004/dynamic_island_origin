@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tuan.islebridge.ui.theme.IslandAccent
+import com.tuan.islebridge.ui.theme.IslandError
 import com.tuan.islebridge.ui.theme.IslandSuccess
 import com.tuan.islebridge.ui.theme.IslandWarning
 
@@ -21,6 +23,7 @@ fun StatusCard(
     description: String,
     icon: ImageVector,
     isPositive: Boolean = true,
+    confidenceText: String? = null,
     actionButtonLabel: String? = null,
     onActionClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -31,51 +34,94 @@ fun StatusCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
+            // Adaptive Header
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isPositive) IslandSuccess else IslandWarning,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = (if (isPositive) IslandSuccess else IslandWarning).copy(alpha = 0.12f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = if (isPositive) IslandSuccess else IslandWarning,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = (if (isPositive) IslandSuccess else IslandWarning).copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = statusText,
-                        color = if (isPositive) IslandSuccess else IslandWarning,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // Status Badge - never breaks vertically
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = (if (isPositive) IslandSuccess else IslandWarning).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = statusText,
+                                color = if (isPositive) IslandSuccess else IslandWarning,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        // Optional Confidence Badge
+                        if (confidenceText != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = IslandAccent.copy(alpha = 0.12f)
+                            ) {
+                                Text(
+                                    text = confidenceText,
+                                    color = IslandAccent,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                lineHeight = 18.sp
             )
 
             if (actionButtonLabel != null && onActionClick != null) {
@@ -88,10 +134,9 @@ fun StatusCard(
                     ),
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text(text = actionButtonLabel)
+                    Text(text = actionButtonLabel, fontSize = 13.sp)
                 }
             }
         }
     }
 }
-

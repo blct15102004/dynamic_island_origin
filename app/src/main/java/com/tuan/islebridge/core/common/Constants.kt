@@ -9,7 +9,6 @@ object Constants {
     const val CHANNEL_BLUETOOTH = "islebridge_bluetooth_channel"
     const val CHANNEL_OTP = "islebridge_otp_channel"
     const val CHANNEL_PRIVACY = "islebridge_privacy_channel"
-    const val CHANNEL_OVERLAY_SERVICE = "islebridge_overlay_service_channel"
 
     // OriginOS Super Island Protocol Keys
     object SuperXProtocol {
@@ -42,8 +41,8 @@ object Constants {
     const val DEFAULT_TIMEOUT_OTP_MS = 30000L
     const val DEFAULT_TIMEOUT_NOTIF_MS = 8000L
     const val DEFAULT_TIMEOUT_PRIVACY_MS = 6000L
+    const val DEFAULT_TIMEOUT_TEST_MS = 3000L
 
     // Preference Keys
     const val PREF_DATASTORE_NAME = "islebridge_preferences"
 }
-

@@ -13,20 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tuan.islebridge.core.shizuku.ShizukuServiceState
 import com.tuan.islebridge.core.shizuku.ShizukuStatus
 import com.tuan.islebridge.ui.components.PermissionRow
+import com.tuan.islebridge.ui.theme.IslandAccent
 import com.tuan.islebridge.ui.theme.IslandSuccess
 
 @Composable
 fun PermissionsScreen(
     hasNotificationListener: Boolean,
-    hasOverlayPermission: Boolean,
     hasPostNotification: Boolean,
     hasBluetoothPermission: Boolean,
     isBatteryOptimizedExempt: Boolean,
     shizukuStatus: ShizukuStatus,
     onRequestNotificationListener: () -> Unit,
-    onRequestOverlay: () -> Unit,
     onRequestPostNotification: () -> Unit,
     onRequestBluetooth: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
@@ -43,19 +43,19 @@ fun PermissionsScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Trung tâm kiểm soát quyền hệ thống",
+            text = "Trung tâm quyền hệ thống",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Quản lý tập trung các quyền Android cần thiết cho IsleBridge",
+            text = "Quản lý các quyền Android cần thiết cho IsleBridge và Origin Island",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // No Accessibility Guarantee Banner
+        // Privacy & Architecture Guarantee Banner
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = IslandSuccess.copy(alpha = 0.12f),
@@ -69,12 +69,13 @@ fun PermissionsScreen(
                     imageVector = Icons.Default.Lock,
                     contentDescription = null,
                     tint = IslandSuccess,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Cam kết quyền hạn: IsleBridge KHÔNG yêu cầu quyền Accessibility Service và KHÔNG yêu cầu Root. Toàn bộ tính năng hoạt động dựa trên Android API chuẩn và Shizuku tùy chọn.",
+                    text = "Cam kết quyền hạn: IsleBridge KHÔNG yêu cầu quyền Accessibility Service, KHÔNG yêu cầu Root và KHÔNG yêu cầu quyền vẽ đè màn hình (Overlay). Toàn bộ hoạt động dựa trên API hệ thống và Shizuku tùy chọn.",
                     fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
@@ -82,10 +83,10 @@ fun PermissionsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. Notification Listener
+        // 1. Notification Listener (Crucial)
         PermissionRow(
             title = "Truy cập thông báo (Notification Listener)",
-            description = "Bắt buộc: Cho phép ứng dụng nhận diện thông báo đến để tạo thẻ Super Island và mã OTP.",
+            description = "Bắt buộc: Để IsleBridge nhận diện thông báo từ ứng dụng và OTP để tích hợp lên Origin Island.",
             isGranted = hasNotificationListener,
             icon = Icons.Default.NotificationsActive,
             onRequestPermission = onRequestNotificationListener
@@ -96,7 +97,7 @@ fun PermissionsScreen(
         // 2. Post Notifications
         PermissionRow(
             title = "Gửi thông báo (POST_NOTIFICATIONS)",
-            description = "Bắt buộc trên Android 13+: Để hiển thị thông báo và gửi thẻ lên Origin Island.",
+            description = "Bắt buộc trên Android 13+: Đảm bảo hiển thị thông báo tiến trình và cập nhật thẻ lên Origin Island.",
             isGranted = hasPostNotification,
             icon = Icons.Default.NotificationAdd,
             onRequestPermission = onRequestPostNotification
@@ -104,21 +105,10 @@ fun PermissionsScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 3. Draw Over Other Apps (Overlay)
-        PermissionRow(
-            title = "Hiển thị đè lên ứng dụng khác (Overlay)",
-            description = "Tùy chọn: Dành cho chế độ Fallback Dynamic Island trên thiết bị không hỗ trợ native OriginOS.",
-            isGranted = hasOverlayPermission,
-            icon = Icons.Default.Layers,
-            onRequestPermission = onRequestOverlay
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 4. Bluetooth Permissions
+        // 3. Bluetooth Permissions
         PermissionRow(
             title = "Thiết bị ở gần (Bluetooth Connect)",
-            description = "Cần thiết: Giám sát tai nghe kết nối và cập nhật mức pin tai nghe / hộp sạc.",
+            description = "Cần thiết: Giám sát tai nghe kết nối và cập nhật mức pin tai nghe / hộp sạc lên đảo.",
             isGranted = hasBluetoothPermission,
             icon = Icons.Default.Bluetooth,
             onRequestPermission = onRequestBluetooth
@@ -126,10 +116,10 @@ fun PermissionsScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 5. Battery Optimization Exemption
+        // 4. Battery Optimization Exemption
         PermissionRow(
             title = "Bỏ qua tối ưu hóa pin (Doze Exemption)",
-            description = "Khuyên dùng: Đảm bảo tiến trình chạy ngầm ổn định không bị hệ điều hành tắt đột ngột.",
+            description = "Khuyên dùng: Đảm bảo tiến trình chạy ngầm ổn định, không bị hệ điều hành tắt khi khóa màn hình.",
             isGranted = isBatteryOptimizedExempt,
             icon = Icons.Default.BatteryChargingFull,
             onRequestPermission = onRequestBatteryExemption
@@ -137,10 +127,17 @@ fun PermissionsScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 6. Shizuku Authorization
+        // 5. Shizuku Authorization (Optional)
+        val shizukuActionLabel = when (shizukuStatus.state) {
+            ShizukuServiceState.AUTHORIZED -> "Đã cấp quyền ✓"
+            ShizukuServiceState.UNAUTHORIZED -> "Ủy quyền"
+            ShizukuServiceState.SERVICE_STOPPED -> "Mở Shizuku"
+            ShizukuServiceState.NOT_INSTALLED -> "Hướng dẫn"
+        }
+
         PermissionRow(
-            title = "Ủy quyền Shizuku (Tùy chọn)",
-            description = "Nâng cao: Tự động miễn trừ Doze và truy vấn chẩn đoán AppOps mà không cần Root.",
+            title = "Ủy quyền Shizuku (Tùy chọn nâng cao)",
+            description = "${shizukuStatus.description}\nKhông bắt buộc: IsleBridge vẫn hoạt động độc lập bình thường.",
             isGranted = shizukuStatus.hasPermission,
             icon = Icons.Default.Code,
             onRequestPermission = onRequestShizuku
@@ -148,7 +145,7 @@ fun PermissionsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 7. Auto-start OEM Guidance Card
+        // 6. Auto-start OEM Guidance Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
@@ -175,7 +172,8 @@ fun PermissionsScreen(
                 Text(
                     text = "Để giữ kết nối đảo liên tục sau khi khởi động lại máy trên OriginOS:\n1. Mở Cài đặt > Pin > Quản lý pin dưới nền > IsleBridge: Chọn 'Cho phép sử dụng pin nền cao'.\n2. Mở ứng dụng iManager > Quản lý quyền > Tự khởi chạy: Bật IsleBridge.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                    lineHeight = 18.sp
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -191,4 +189,3 @@ fun PermissionsScreen(
         }
     }
 }
-

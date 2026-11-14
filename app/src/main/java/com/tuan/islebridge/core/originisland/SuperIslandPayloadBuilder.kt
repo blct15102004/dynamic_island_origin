@@ -50,7 +50,8 @@ object SuperIslandPayloadBuilder {
         channelId: String,
         payload: SuperIslandPayload,
         contentIntent: PendingIntent? = null,
-        action: NotificationCompat.Action? = null
+        action: NotificationCompat.Action? = null,
+        isOngoing: Boolean = false
     ): Notification {
         val extras = buildNotificationExtras(payload)
 
@@ -60,8 +61,8 @@ object SuperIslandPayloadBuilder {
             .setContentText(payload.content)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setOngoing(payload.operation != SuperIslandOperation.UNMOUNT)
-            .setAutoCancel(false)
+            .setOngoing(isOngoing && payload.operation != SuperIslandOperation.UNMOUNT)
+            .setAutoCancel(!isOngoing)
             .addExtras(extras)
 
         if (payload.progress != null && payload.maxProgress != null) {
@@ -90,7 +91,6 @@ object SuperIslandPayloadBuilder {
             showNotify = false,
             isIsland = false
         )
-        return buildNotification(context, channelId, unmountPayload)
+        return buildNotification(context, channelId, unmountPayload, isOngoing = false)
     }
 }
-

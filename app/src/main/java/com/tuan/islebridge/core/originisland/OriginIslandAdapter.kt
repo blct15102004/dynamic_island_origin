@@ -4,16 +4,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.tuan.islebridge.core.common.CompatibilityDetector
 import com.tuan.islebridge.core.common.Constants
-import com.tuan.islebridge.core.common.OriginOsCompatibilityStatus
-import com.tuan.islebridge.core.overlay.OverlayService
 
 class OriginIslandAdapter(private val context: Context) {
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val mainHandler = Handler(Looper.getMainLooper())
     val priorityQueue = IslandPriorityQueue()
+
+    private val activeTestEventIds = mutableSetOf<String>()
 
     init {
         createNotificationChannels()
@@ -27,7 +30,7 @@ class OriginIslandAdapter(private val context: Context) {
                     "Origin Island Notifications",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Channal for Super Island and Island notifications"
+                    description = "Channel for Origin Island notifications"
                     setShowBadge(false)
                 },
                 NotificationChannel(
@@ -63,14 +66,13 @@ class OriginIslandAdapter(private val context: Context) {
         card: IslandCardModel,
         channelId: String = Constants.CHANNEL_ISLAND_NOTIFICATION,
         forceNative: Boolean = false,
-        useOverlay: Boolean = false
+        isTestEvent: Boolean = false
     ) {
         priorityQueue.postOrUpdate(card)
 
-        val compatibility = CompatibilityDetector.detectCompatibility()
-        val isNativeSupported = forceNative ||
-                compatibility.status == OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_6_SUPPORTED ||
-                compatibility.status == OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_7_EXPERIMENTAL
+        if (isTestEvent) {
+            activeTestEventIds.add(card.id)
+        }
 
         val templateId = when {
             card.progress != null -> Constants.SuperXProtocol.TEMPLATE_PROGRESS
@@ -97,7 +99,7 @@ class OriginIslandAdapter(private val context: Context) {
             maxProgress = card.maxProgress,
             baseInfos = baseInfoList,
             shortInfos = "${card.title}: ${card.subtitle}",
-            timeoutMs = card.timeoutMs
+            timeoutMs = if (isTestEvent) Constants.DEFAULT_TIMEOUT_TEST_MS else card.timeoutMs
         )
 
         var action: NotificationCompat.Action? = null
@@ -109,21 +111,27 @@ class OriginIslandAdapter(private val context: Context) {
             ).build()
         }
 
-        // Post notification (which includes Super Island protocol extras)
+        // Post notification (with Super Island protocol extras)
+        // Test events are strictly NEVER ongoing so they do not get stuck
+        val isOngoing = !isTestEvent && card.priority != CardPriority.LOW
         val notification = SuperIslandPayloadBuilder.buildNotification(
             context = context,
             channelId = channelId,
             payload = payload,
             contentIntent = card.actionIntent,
-            action = action
+            action = action,
+            isOngoing = isOngoing
         )
 
         val notificationId = card.id.hashCode()
         notificationManager.notify(notificationId, notification)
 
-        // Overlay fallback handling
-        if (useOverlay || (!isNativeSupported && useOverlay)) {
-            OverlayService.showCard(context, card)
+        // If test event, automatically schedule unmount after 3 seconds as required by specification
+        if (isTestEvent) {
+            mainHandler.postDelayed({
+                unmountCard(card.id, card.scene, channelId)
+                activeTestEventIds.remove(card.id)
+            }, Constants.DEFAULT_TIMEOUT_TEST_MS)
         }
     }
 
@@ -132,7 +140,8 @@ class OriginIslandAdapter(private val context: Context) {
         scene: IslandScene = IslandScene.SYSTEM,
         channelId: String = Constants.CHANNEL_ISLAND_NOTIFICATION
     ) {
-        val removed = priorityQueue.remove(cardId)
+        priorityQueue.remove(cardId)
+        activeTestEventIds.remove(cardId)
         val notificationId = cardId.hashCode()
 
         // Send unmount payload so OriginOS Island dismisses the card smoothly
@@ -142,10 +151,39 @@ class OriginIslandAdapter(private val context: Context) {
             eventId = cardId,
             scene = scene
         )
-        notificationManager.notify(notificationId, unmountNotification)
-        notificationManager.cancel(notificationId)
+        try {
+            notificationManager.notify(notificationId, unmountNotification)
+        } catch (_: Throwable) {}
+        try {
+            notificationManager.cancel(notificationId)
+        } catch (_: Throwable) {}
+    }
 
-        OverlayService.dismissCard(context, cardId)
+    /**
+     * Unmounts ONLY IsleBridge test cards and cancels test notifications.
+     * Returns the count of removed active test events.
+     */
+    fun unmountAllTestCards(): Int {
+        val testCards = activeTestEventIds.toList()
+        var count = 0
+
+        for (testId in testCards) {
+            unmountCard(testId)
+            count++
+        }
+
+        // Also clean any known test IDs just in case
+        val standardTestIds = listOf("test_media", "test_download", "test_otp", "test_alert")
+        for (stdId in standardTestIds) {
+            val notifId = stdId.hashCode()
+            try {
+                notificationManager.cancel(notifId)
+            } catch (_: Throwable) {}
+            priorityQueue.remove(stdId)
+        }
+
+        activeTestEventIds.clear()
+        return count
     }
 
     fun cleanExpiredCards(channelId: String = Constants.CHANNEL_ISLAND_NOTIFICATION) {
@@ -155,4 +193,3 @@ class OriginIslandAdapter(private val context: Context) {
         }
     }
 }
-

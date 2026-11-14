@@ -72,7 +72,7 @@ jobs:
           echo "Build successful! APK size: $APK_SIZE bytes"
           mkdir -p release_assets
           cp "$APK_PATH" release_assets/IsleBridge.apk
-          cp "$APK_PATH" release_assets/IsleBridge-v1.0.0.apk
+          cp "$APK_PATH" release_assets/IsleBridge-v1.1.0.apk
 
       - name: Upload Build Log (if failed)
         if: failure()
@@ -93,23 +93,24 @@ jobs:
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "IsleBridge v1.0.0 (Bản cài đặt trực tiếp)"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.1.0' }}
+          name: "IsleBridge v1.1.0 (Origin Island Native)"
           files: |
             release_assets/IsleBridge.apk
-            release_assets/IsleBridge-v1.0.0.apk
+            release_assets/IsleBridge-v1.1.0.apk
           body: |
-            ### 📱 IsleBridge v1.0.0 — Origin Island Companion
+            ### 📱 IsleBridge v1.1.0 — Origin Island Native Companion
             
-            Bản APK cài đặt trực tiếp cho điện thoại vivo, iQOO (OriginOS 6 / 7) và tất cả các thiết bị Android (Android 8.0+).
+            Bản cập nhật v1.1.0 chính thức cho điện thoại **vivo và iQOO (OriginOS 6 / OriginOS 7)**:
+            - **100% Native Origin Island:** Tích hợp trực tiếp với Super Island gốc của hệ thống vivo/iQOO, loại bỏ hoàn toàn các lớp phủ giả (Overlay) và không cần quyền vẽ đè màn hình.
+            - **Giao diện Material 3 đáp ứng (Responsive):** Khắc phục triệt để lỗi huy hiệu bị ép hẹp và vỡ chữ, lưới tính năng 2x2 cân đối, giao diện mượt mà.
+            - **Nhận diện thiết bị thông minh:** Hỗ trợ chính xác thiết bị vivo/iQOO với thang đo độ tin cậy (*Confirmed / Estimated*).
+            - **Trung tâm Shizuku hoàn thiện:** Hướng dẫn từng bước kích hoạt Gỡ lỗi không dây và ủy quyền an toàn không cần Root.
+            - **Quản lý ứng dụng trực quan:** Hiển thị icon thật của ứng dụng, tìm kiếm tức thì, phân loại danh sách Origin Player và bảo vệ app tài chính.
+            - **Thử nghiệm thông minh:** Thẻ test tự động ẩn sau 3 giây; nút Unmount dọn sạch thẻ thử nghiệm.
             
-            #### 📥 Tải về:
-            - Nhấn vào **`IsleBridge.apk`** bên dưới để tải trực tiếp về điện thoại.
-            
-            #### 🛠 Hướng dẫn cài đặt:
-            1. Mở file vừa tải về từ thông báo trình duyệt hoặc ứng dụng **Tệp (Files)**.
-            2. Nhấn **Cài đặt** (Bật *"Cho phép từ nguồn này"* nếu máy hỏi).
-            3. Mở ứng dụng **IsleBridge** và làm theo hướng dẫn cấp quyền nhanh trên màn hình để bắt đầu dùng Dynamic Island!
+            #### 📥 Tải về và cài đặt:
+            - Nhấn tải file **`IsleBridge.apk`** bên dưới và nhấn **Cài đặt**.
           draft: false
           prerelease: false
           make_latest: true

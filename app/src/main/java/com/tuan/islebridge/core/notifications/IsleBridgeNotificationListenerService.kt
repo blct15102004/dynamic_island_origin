@@ -103,8 +103,7 @@ class IsleBridgeNotificationListenerService : NotificationListenerService() {
 
             islandAdapter.displayCard(
                 card = card,
-                forceNative = prefs.forceNativeIsland,
-                useOverlay = prefs.isOverlayFallbackEnabled
+                forceNative = prefs.forceNativeIsland
             )
         }
     }

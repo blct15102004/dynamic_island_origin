@@ -23,13 +23,11 @@ import com.tuan.islebridge.ui.theme.IslandSuccess
 fun PermissionActivationDialog(
     hasNotificationListener: Boolean,
     hasPostNotification: Boolean,
-    hasOverlayPermission: Boolean,
     hasBluetoothPermission: Boolean,
     isBatteryOptimizedExempt: Boolean,
     onRequestQuickPermissions: () -> Unit,
     onRequestNotificationListener: () -> Unit,
     onRequestPostNotification: () -> Unit,
-    onRequestOverlay: () -> Unit,
     onRequestBluetooth: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onDismiss: () -> Unit,
@@ -43,8 +41,8 @@ fun PermissionActivationDialog(
     ) {
         Surface(
             modifier = modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.88f),
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
@@ -62,19 +60,19 @@ fun PermissionActivationDialog(
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Security,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -83,7 +81,7 @@ fun PermissionActivationDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Cấp các quyền cần thiết để đảo hoạt động",
+                            text = "Cấp quyền để kết nối Origin Island hệ thống",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -132,7 +130,7 @@ fun PermissionActivationDialog(
                     // 2. Post Notification (Android 13+)
                     PermissionStepItem(
                         title = "2. Gửi thông báo (POST_NOTIFICATIONS)",
-                        description = "Bắt buộc (Android 13+): Đảm bảo hiển thị thẻ Origin Island và thông báo service ngầm.",
+                        description = "Bắt buộc (Android 13+): Đảm bảo hiển thị thẻ Origin Island và thông báo dịch vụ.",
                         isRequired = true,
                         isGranted = hasPostNotification,
                         icon = Icons.Default.NotificationAdd,
@@ -140,21 +138,10 @@ fun PermissionActivationDialog(
                         onAction = onRequestPostNotification
                     )
 
-                    // 3. Draw Over Other Apps (Overlay)
+                    // 3. Bluetooth Connect
                     PermissionStepItem(
-                        title = "3. Hiển thị đè lên màn hình (Overlay)",
-                        description = "Cần thiết nếu dùng chế độ Đảo nổi (Fallback) khi thiết bị không hỗ trợ native OriginOS 6/7.",
-                        isRequired = false,
-                        isGranted = hasOverlayPermission,
-                        icon = Icons.Default.Layers,
-                        buttonLabel = "Cấp quyền",
-                        onAction = onRequestOverlay
-                    )
-
-                    // 4. Bluetooth Connect
-                    PermissionStepItem(
-                        title = "4. Thiết bị Bluetooth ở gần",
-                        description = "Để tự động phát hiện tai nghe không dây và hiển thị phần trăm pin tai nghe / hộp sạc lên đảo.",
+                        title = "3. Thiết bị Bluetooth ở gần",
+                        description = "Để tự động phát hiện tai nghe không dây và hiển thị pin tai nghe / hộp sạc lên đảo.",
                         isRequired = false,
                         isGranted = hasBluetoothPermission,
                         icon = Icons.Default.Bluetooth,
@@ -162,10 +149,10 @@ fun PermissionActivationDialog(
                         onAction = onRequestBluetooth
                     )
 
-                    // 5. Battery Optimization Exemption
+                    // 4. Battery Optimization Exemption
                     PermissionStepItem(
-                        title = "5. Bỏ qua tối ưu hóa pin (Doze)",
-                        description = "Khuyên dùng: Giúp service chạy ngầm ổn định, không bị hệ điều hành tắt khi khóa màn hình.",
+                        title = "4. Bỏ qua tối ưu hóa pin (Doze)",
+                        description = "Khuyên dùng: Giúp dịch vụ chạy ngầm ổn định, không bị hệ điều hành tắt khi khóa màn hình.",
                         isRequired = false,
                         isGranted = isBatteryOptimizedExempt,
                         icon = Icons.Default.BatteryChargingFull,
@@ -311,4 +298,3 @@ private fun PermissionStepItem(
         }
     }
 }
-

@@ -16,7 +16,6 @@ class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
         val KEY_ISLAND_ENABLED = booleanPreferencesKey("island_enabled")
-        val KEY_OVERLAY_FALLBACK = booleanPreferencesKey("overlay_fallback")
         val KEY_FORCE_NATIVE_ISLAND = booleanPreferencesKey("force_native_island")
         val KEY_NOTIF_MIRRORING_ENABLED = booleanPreferencesKey("notif_mirroring_enabled")
         val KEY_BLUETOOTH_MONITORING = booleanPreferencesKey("bluetooth_monitoring")
@@ -46,7 +45,6 @@ class UserPreferencesRepository(private val context: Context) {
             val defaultBlocked = IsleBridgePreferences().blockedPackages
             IsleBridgePreferences(
                 isIslandEnabled = preferences[PreferencesKeys.KEY_ISLAND_ENABLED] ?: true,
-                isOverlayFallbackEnabled = preferences[PreferencesKeys.KEY_OVERLAY_FALLBACK] ?: false,
                 forceNativeIsland = preferences[PreferencesKeys.KEY_FORCE_NATIVE_ISLAND] ?: false,
                 isNotificationMirroringEnabled = preferences[PreferencesKeys.KEY_NOTIF_MIRRORING_ENABLED] ?: true,
                 isBluetoothMonitoringEnabled = preferences[PreferencesKeys.KEY_BLUETOOTH_MONITORING] ?: true,
@@ -67,10 +65,6 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun updateIslandEnabled(enabled: Boolean) {
         context.dataStore.edit { it[PreferencesKeys.KEY_ISLAND_ENABLED] = enabled }
-    }
-
-    suspend fun updateOverlayFallback(enabled: Boolean) {
-        context.dataStore.edit { it[PreferencesKeys.KEY_OVERLAY_FALLBACK] = enabled }
     }
 
     suspend fun updateForceNativeIsland(forced: Boolean) {
@@ -137,4 +131,3 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 }
-

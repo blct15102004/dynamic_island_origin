@@ -4,66 +4,149 @@ import android.os.Build
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
+enum class DetectionConfidence {
+    CONFIRMED,
+    ESTIMATED,
+    UNKNOWN
+}
+
 enum class OriginOsCompatibilityStatus {
-    NATIVE_ORIGIN_OS_6_SUPPORTED,
-    NATIVE_ORIGIN_OS_7_EXPERIMENTAL,
-    VIVO_LEGACY_UNSUPPORTED,
-    NON_VIVO_FALLBACK
+    NATIVE_ORIGIN_OS_SUPPORTED,
+    NATIVE_ORIGIN_OS_EXPERIMENTAL,
+    VIVO_LEGACY_OR_UNCONFIRMED,
+    NON_VIVO_DEVICE
 }
 
 data class DeviceCompatibilityInfo(
     val manufacturer: String,
     val brand: String,
     val model: String,
+    val deviceCodename: String,
+    val product: String,
     val androidSdk: Int,
     val androidRelease: String,
+    val buildDisplay: String,
+    val buildFingerprint: String,
     val originOsVersion: String?,
+    val originOsBuildNumber: String?,
     val isVivoDevice: Boolean,
     val status: OriginOsCompatibilityStatus,
+    val confidence: DetectionConfidence,
     val statusDescription: String
-)
+) {
+    val isSuperIslandSupported: Boolean
+        get() = status == OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_SUPPORTED ||
+                status == OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_EXPERIMENTAL
+}
 
 object CompatibilityDetector {
+
+    private val VIVO_PROPERTY_KEYS = listOf(
+        "ro.vivo.os.version",
+        "ro.vivo.os.build.display.id",
+        "ro.vivo.os.name",
+        "ro.vivo.rom",
+        "ro.vivo.rom.version",
+        "ro.build.version.vivo",
+        "ro.vivo.product.version",
+        "ro.vivo.product.model",
+        "ro.product.model"
+    )
 
     fun detectCompatibility(): DeviceCompatibilityInfo {
         val manufacturer = Build.MANUFACTURER.orEmpty()
         val brand = Build.BRAND.orEmpty()
         val model = Build.MODEL.orEmpty()
+        val deviceCodename = Build.DEVICE.orEmpty()
+        val product = Build.PRODUCT.orEmpty()
         val sdk = Build.VERSION.SDK_INT
         val release = Build.VERSION.RELEASE.orEmpty()
+        val display = Build.DISPLAY.orEmpty()
+        val fingerprint = Build.FINGERPRINT.orEmpty()
 
         val isVivo = manufacturer.equals("vivo", ignoreCase = true) ||
                 brand.equals("vivo", ignoreCase = true) ||
                 manufacturer.equals("iqoo", ignoreCase = true) ||
-                brand.equals("iqoo", ignoreCase = true)
+                brand.equals("iqoo", ignoreCase = true) ||
+                fingerprint.contains("vivo", ignoreCase = true) ||
+                fingerprint.contains("iqoo", ignoreCase = true)
 
-        val osVersionRaw = getSystemProperty("ro.vivo.os.version")
-            ?.takeIf { it.isNotBlank() }
-            ?: getSystemProperty("ro.vivo.os.build.display.id")
-            ?.takeIf { it.isNotBlank() }
-            ?: getSystemProperty("ro.vivo.product.version")
+        // Query system properties via reflection and getprop fallback
+        var detectedVersion: String? = null
+        var detectedBuildNumber: String? = null
 
-        val (status, desc) = if (!isVivo) {
-            OriginOsCompatibilityStatus.NON_VIVO_FALLBACK to
-                    "Thiết bị không phải vivo/iQOO. Kích hoạt chế độ Native Notification & Custom Overlay Fallback."
-        } else {
-            when {
-                osVersionRaw != null && osVersionRaw.contains("OriginOS 6", ignoreCase = true) -> {
-                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_6_SUPPORTED to
-                            "Phát hiện OriginOS 6: Hỗ trợ đầy đủ native Super Island protocol."
+        for (key in VIVO_PROPERTY_KEYS) {
+            val value = getSystemProperty(key)
+            if (!value.isNullOrBlank()) {
+                if (key == "ro.vivo.os.version" || key == "ro.vivo.rom.version" || key == "ro.vivo.os.name") {
+                    if (detectedVersion == null) detectedVersion = value
                 }
-                osVersionRaw != null && osVersionRaw.contains("OriginOS 7", ignoreCase = true) -> {
-                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_7_EXPERIMENTAL to
-                            "Phát hiện OriginOS 7: Tính năng Origin Island đang ở trạng thái thử nghiệm (Experimental)."
+                if (key == "ro.vivo.os.build.display.id" || key == "ro.build.version.vivo") {
+                    if (detectedBuildNumber == null) detectedBuildNumber = value
                 }
-                osVersionRaw != null && (osVersionRaw.contains("OriginOS", ignoreCase = true) || osVersionRaw.startsWith("6.")) -> {
-                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_6_SUPPORTED to
-                            "Phát hiện OriginOS: Kích hoạt native Super Island integration."
-                }
-                else -> {
-                    OriginOsCompatibilityStatus.VIVO_LEGACY_UNSUPPORTED to
-                            "Thiết bị vivo nhưng không xác định rõ OriginOS 6/7. Hỗ trợ qua Fallback Overlay và Android Notifications."
-                }
+            }
+        }
+
+        // Secondary search in build display string if properties were restricted
+        if (detectedVersion == null) {
+            if (display.contains("OriginOS", ignoreCase = true)) {
+                detectedVersion = display
+            }
+        }
+
+        val (status, confidence, desc) = when {
+            !isVivo -> {
+                Triple(
+                    OriginOsCompatibilityStatus.NON_VIVO_DEVICE,
+                    DetectionConfidence.CONFIRMED,
+                    "Thiết bị không phải vivo/iQOO ($manufacturer $model). Origin Island chỉ hỗ trợ trên vivo/iQOO chạy OriginOS."
+                )
+            }
+
+            detectedVersion != null && detectedVersion.contains("OriginOS 7", ignoreCase = true) -> {
+                Triple(
+                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_EXPERIMENTAL,
+                    DetectionConfidence.CONFIRMED,
+                    "Phát hiện OriginOS 7 ($detectedVersion): Hỗ trợ Super Island Native ở trạng thái thử nghiệm."
+                )
+            }
+
+            detectedVersion != null && (
+                    detectedVersion.contains("OriginOS 6", ignoreCase = true) ||
+                            detectedVersion.contains("OriginOS 5", ignoreCase = true) ||
+                            detectedVersion.contains("OriginOS 4", ignoreCase = true) ||
+                            detectedVersion.contains("OriginOS", ignoreCase = true)
+                    ) -> {
+                Triple(
+                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_SUPPORTED,
+                    DetectionConfidence.CONFIRMED,
+                    "Xác nhận OriginOS ($detectedVersion): Thiết bị hỗ trợ đầy đủ giao thức Super Island gốc."
+                )
+            }
+
+            // Modern vivo/iQOO devices (Android 14+, e.g. V2403A on Android 16/15) where property access was restricted
+            isVivo && sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+                Triple(
+                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_SUPPORTED,
+                    DetectionConfidence.ESTIMATED,
+                    "Thiết bị $manufacturer $model chạy Android $release (API $sdk). Tương thích với nền tảng OriginOS hiện đại và Super Island."
+                )
+            }
+
+            isVivo && sdk >= Build.VERSION_CODES.TIRAMISU -> {
+                Triple(
+                    OriginOsCompatibilityStatus.NATIVE_ORIGIN_OS_SUPPORTED,
+                    DetectionConfidence.ESTIMATED,
+                    "Thiết bị $manufacturer $model (Android $release). Đủ điều kiện hỗ trợ Super Island native."
+                )
+            }
+
+            else -> {
+                Triple(
+                    OriginOsCompatibilityStatus.VIVO_LEGACY_OR_UNCONFIRMED,
+                    DetectionConfidence.ESTIMATED,
+                    "Thiết bị $manufacturer $model (Android $release). Chưa xác nhận phiên bản OriginOS tương thích."
+                )
             }
         }
 
@@ -71,24 +154,39 @@ object CompatibilityDetector {
             manufacturer = manufacturer,
             brand = brand,
             model = model,
+            deviceCodename = deviceCodename,
+            product = product,
             androidSdk = sdk,
             androidRelease = release,
-            originOsVersion = osVersionRaw,
+            buildDisplay = display,
+            buildFingerprint = fingerprint,
+            originOsVersion = detectedVersion,
+            originOsBuildNumber = detectedBuildNumber,
             isVivoDevice = isVivo,
             status = status,
+            confidence = confidence,
             statusDescription = desc
         )
     }
 
     private fun getSystemProperty(key: String): String? {
-        return try {
+        // Reflection on android.os.SystemProperties
+        try {
+            val c = Class.forName("android.os.SystemProperties")
+            val getMethod = c.getMethod("get", String::class.java)
+            val value = getMethod.invoke(null, key) as? String
+            if (!value.isNullOrBlank()) return value.trim()
+        } catch (_: Throwable) {}
+
+        // Fallback: getprop CLI
+        try {
             val process = Runtime.getRuntime().exec(arrayOf("getprop", key))
             BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                reader.readLine()?.trim()
+                val line = reader.readLine()?.trim()
+                if (!line.isNullOrBlank()) return line
             }
-        } catch (_: Exception) {
-            null
-        }
+        } catch (_: Throwable) {}
+
+        return null
     }
 }
-

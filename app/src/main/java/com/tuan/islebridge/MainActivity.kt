@@ -38,6 +38,7 @@ import com.tuan.islebridge.core.originisland.OriginIslandAdapter
 import com.tuan.islebridge.core.otp.ClipboardHelper
 import com.tuan.islebridge.core.otp.OtpDetectorEngine
 import com.tuan.islebridge.core.privacy.PrivacyMonitor
+import com.tuan.islebridge.core.shizuku.ShizukuServiceState
 import com.tuan.islebridge.core.updater.GithubOtaUpdater
 import com.tuan.islebridge.core.updater.UpdateCheckResult
 import com.tuan.islebridge.ui.components.PermissionActivationDialog
@@ -55,6 +56,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var bluetoothMonitor: BluetoothEarbudMonitor
     private lateinit var privacyMonitor: PrivacyMonitor
     private lateinit var otaUpdater: GithubOtaUpdater
+
+    private val ORIGIN_PLAYER_CANDIDATE_PACKAGES = setOf(
+        "com.kugou.android",
+        "com.tencent.qqmusic",
+        "com.netease.cloudmusic",
+        "com.ximalaya.ting.android",
+        "com.lrts.me",
+        "bubei.tingshu",
+        "cn.kuwo.player",
+        "com.spotify.music",
+        "com.apple.android.music"
+    )
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -102,7 +115,6 @@ class MainActivity : ComponentActivity() {
             // Dynamic live permission states
             var hasNotificationListener by remember { mutableStateOf(isNotificationListenerGranted()) }
             var hasPostNotification by remember { mutableStateOf(hasPostNotificationPermission()) }
-            var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(this@MainActivity)) }
             var hasBluetoothPermission by remember { mutableStateOf(bluetoothMonitor.hasBluetoothPermission()) }
             var isBatteryOptimizedExempt by remember { mutableStateOf(isBatteryOptimizationExempt()) }
 
@@ -117,7 +129,6 @@ class MainActivity : ComponentActivity() {
                     if (event == Lifecycle.Event.ON_RESUME) {
                         hasNotificationListener = isNotificationListenerGranted()
                         hasPostNotification = hasPostNotificationPermission()
-                        hasOverlayPermission = Settings.canDrawOverlays(this@MainActivity)
                         hasBluetoothPermission = bluetoothMonitor.hasBluetoothPermission()
                         isBatteryOptimizedExempt = isBatteryOptimizationExempt()
                     }
@@ -177,9 +188,6 @@ class MainActivity : ComponentActivity() {
                                 onToggleIsland = { enabled ->
                                     lifecycleScope.launch { preferencesRepo.updateIslandEnabled(enabled) }
                                 },
-                                onToggleOverlayFallback = { enabled ->
-                                    lifecycleScope.launch { preferencesRepo.updateOverlayFallback(enabled) }
-                                },
                                 onOpenPermissions = {
                                     showPermissionActivationDialog = true
                                 },
@@ -191,6 +199,28 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigateToPrivacy = {
                                     navController.navigate(Screen.Privacy.route)
+                                },
+                                onRequestShizuku = {
+                                    if (shizukuStatus.state == ShizukuServiceState.AUTHORIZED) {
+                                        Toast.makeText(this@MainActivity, "Shizuku đã được ủy quyền sẵn.", Toast.LENGTH_SHORT).show()
+                                    } else if (shizukuStatus.state == ShizukuServiceState.UNAUTHORIZED) {
+                                        val requested = app.shizukuManager.requestPermission()
+                                        if (!requested) {
+                                            Toast.makeText(this@MainActivity, "Không thể gửi yêu cầu đến Shizuku. Vui lòng kiểm tra lại dịch vụ.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else if (shizukuStatus.state == ShizukuServiceState.SERVICE_STOPPED) {
+                                        val opened = app.shizukuManager.openShizukuApp()
+                                        if (!opened) app.shizukuManager.openDownloadPage()
+                                    } else {
+                                        app.shizukuManager.openDownloadPage()
+                                    }
+                                },
+                                onOpenShizukuApp = {
+                                    val opened = app.shizukuManager.openShizukuApp()
+                                    if (!opened) app.shizukuManager.openDownloadPage()
+                                },
+                                onOpenShizukuDownload = {
+                                    app.shizukuManager.openDownloadPage()
                                 }
                             )
                         }
@@ -201,9 +231,6 @@ class MainActivity : ComponentActivity() {
                                 onToggleForceNative = { forced ->
                                     lifecycleScope.launch { preferencesRepo.updateForceNativeIsland(forced) }
                                 },
-                                onToggleOverlayFallback = { enabled ->
-                                    lifecycleScope.launch { preferencesRepo.updateOverlayFallback(enabled) }
-                                },
                                 onUpdateTimeout = { timeout ->
                                     lifecycleScope.launch { preferencesRepo.updateOtpTimeout(timeout) }
                                 },
@@ -211,11 +238,11 @@ class MainActivity : ComponentActivity() {
                                     islandAdapter.displayCard(
                                         card = card,
                                         forceNative = preferences.forceNativeIsland,
-                                        useOverlay = preferences.isOverlayFallbackEnabled
+                                        isTestEvent = true
                                     )
                                 },
                                 onClearAllCards = {
-                                    islandAdapter.priorityQueue.clear()
+                                    islandAdapter.unmountAllTestCards()
                                 }
                             )
                         }
@@ -281,20 +308,12 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Permissions.route) {
                             PermissionsScreen(
                                 hasNotificationListener = hasNotificationListener,
-                                hasOverlayPermission = hasOverlayPermission,
                                 hasPostNotification = hasPostNotification,
                                 hasBluetoothPermission = hasBluetoothPermission,
                                 isBatteryOptimizedExempt = isBatteryOptimizedExempt,
                                 shizukuStatus = shizukuStatus,
                                 onRequestNotificationListener = {
                                     startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                },
-                                onRequestOverlay = {
-                                    val intent = Intent(
-                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:$packageName")
-                                    )
-                                    startActivity(intent)
                                 },
                                 onRequestPostNotification = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -310,7 +329,19 @@ class MainActivity : ComponentActivity() {
                                     requestBatteryOptimizationExemption()
                                 },
                                 onRequestShizuku = {
-                                    app.shizukuManager.requestPermission()
+                                    if (shizukuStatus.state == ShizukuServiceState.AUTHORIZED) {
+                                        Toast.makeText(this@MainActivity, "Shizuku đã được ủy quyền.", Toast.LENGTH_SHORT).show()
+                                    } else if (shizukuStatus.state == ShizukuServiceState.UNAUTHORIZED) {
+                                        val ok = app.shizukuManager.requestPermission()
+                                        if (!ok) {
+                                            Toast.makeText(this@MainActivity, "Yêu cầu ủy quyền thất bại. Kiểm tra trạng thái Shizuku.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else if (shizukuStatus.state == ShizukuServiceState.SERVICE_STOPPED) {
+                                        val opened = app.shizukuManager.openShizukuApp()
+                                        if (!opened) app.shizukuManager.openDownloadPage()
+                                    } else {
+                                        app.shizukuManager.openDownloadPage()
+                                    }
                                 },
                                 onOpenAutoStartSettings = {
                                     openApplicationDetails()
@@ -366,7 +397,6 @@ class MainActivity : ComponentActivity() {
                     PermissionActivationDialog(
                         hasNotificationListener = hasNotificationListener,
                         hasPostNotification = hasPostNotification,
-                        hasOverlayPermission = hasOverlayPermission,
                         hasBluetoothPermission = hasBluetoothPermission,
                         isBatteryOptimizedExempt = isBatteryOptimizedExempt,
                         onRequestQuickPermissions = {
@@ -388,13 +418,6 @@ class MainActivity : ComponentActivity() {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }
-                        },
-                        onRequestOverlay = {
-                            val intent = Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:$packageName")
-                            )
-                            startActivity(intent)
                         },
                         onRequestBluetooth = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -451,11 +474,22 @@ class MainActivity : ComponentActivity() {
             val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
             val appName = pm.getApplicationLabel(appInfo).toString()
             val isFinancial = AppFilterManager.isFinancialApp(appInfo.packageName)
+            val isOriginPlayer = ORIGIN_PLAYER_CANDIDATE_PACKAGES.contains(appInfo.packageName)
+
+            val compatibilityStatus = when {
+                isFinancial -> AppCompatibilityStatus.FINANCIAL_PROTECTED
+                isOriginPlayer -> AppCompatibilityStatus.ORIGIN_PLAYER_COMPATIBLE
+                isSystem -> AppCompatibilityStatus.GENERAL_NOTIFICATION
+                else -> AppCompatibilityStatus.SUPERX_NATIVE_ELIGIBLE
+            }
+
             AppItem(
                 packageName = appInfo.packageName,
                 appName = appName,
                 isSystemApp = isSystem,
-                isFinancial = isFinancial
+                isFinancial = isFinancial,
+                isOriginPlayerCandidate = isOriginPlayer,
+                compatibilityStatus = compatibilityStatus
             )
         }.sortedBy { it.appName.lowercase() }
     }
