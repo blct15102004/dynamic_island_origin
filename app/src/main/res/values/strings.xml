@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">IsleBridge</string>
+    <string name="notification_service_label">IsleBridge Notification Listener</string>
+    <string name="tile_label">IsleBridge Island</string>
+    <string name="tile_desc">Toggle IsleBridge Origin Island Companion</string>
+</resources>
+
