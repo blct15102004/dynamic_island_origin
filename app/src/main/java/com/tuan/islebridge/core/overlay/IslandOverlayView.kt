@@ -2,11 +2,9 @@ package com.tuan.islebridge.core.overlay
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout

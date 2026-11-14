@@ -1,13 +1,11 @@
 package com.tuan.islebridge.core.tile
 
 import android.content.Intent
-import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
 import com.tuan.islebridge.MainActivity
-import com.tuan.islebridge.R
 import com.tuan.islebridge.core.datastore.UserPreferencesRepository
 import com.tuan.islebridge.core.notifications.IsleBridgeNotificationListenerService
 import kotlinx.coroutines.*

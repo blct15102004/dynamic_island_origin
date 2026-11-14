@@ -66,7 +66,7 @@ fun PermissionsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.VerifiedUser,
+                    imageVector = Icons.Default.Lock,
                     contentDescription = null,
                     tint = IslandSuccess,
                     modifier = Modifier.size(24.dp)
@@ -142,7 +142,7 @@ fun PermissionsScreen(
             title = "Ủy quyền Shizuku (Tùy chọn)",
             description = "Nâng cao: Tự động miễn trừ Doze và truy vấn chẩn đoán AppOps mà không cần Root.",
             isGranted = shizukuStatus.hasPermission,
-            icon = Icons.Default.Terminal,
+            icon = Icons.Default.Code,
             onRequestPermission = onRequestShizuku
         )
 
@@ -157,7 +157,7 @@ fun PermissionsScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.SettingsPower,
+                        imageVector = Icons.Default.Settings,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)

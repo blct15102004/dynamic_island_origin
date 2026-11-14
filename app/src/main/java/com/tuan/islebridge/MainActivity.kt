@@ -19,7 +19,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,8 +39,8 @@ import com.tuan.islebridge.core.otp.ClipboardHelper
 import com.tuan.islebridge.core.otp.OtpDetectorEngine
 import com.tuan.islebridge.core.privacy.PrivacyMonitor
 import com.tuan.islebridge.core.updater.GithubOtaUpdater
-import com.tuan.islebridge.core.updater.ReleaseInfo
 import com.tuan.islebridge.core.updater.UpdateCheckResult
+import com.tuan.islebridge.ui.components.PermissionActivationDialog
 import com.tuan.islebridge.ui.navigation.Screen
 import com.tuan.islebridge.ui.navigation.bottomNavScreens
 import com.tuan.islebridge.ui.screens.*
@@ -55,12 +58,21 @@ class MainActivity : ComponentActivity() {
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* refreshed via onResume */ }
+    ) { /* refreshed via onResume/LifecycleEventObserver */ }
 
     private val requestBluetoothPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) bluetoothMonitor.startMonitoring()
+    }
+
+    private val requestMultiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val bluetoothGranted = permissions[Manifest.permission.BLUETOOTH_CONNECT] == true
+        if (bluetoothGranted) {
+            bluetoothMonitor.startMonitoring()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +98,35 @@ class MainActivity : ComponentActivity() {
 
             var updateCheckResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
             var isCheckingUpdate by remember { mutableStateOf(false) }
+
+            // Dynamic live permission states
+            var hasNotificationListener by remember { mutableStateOf(isNotificationListenerGranted()) }
+            var hasPostNotification by remember { mutableStateOf(hasPostNotificationPermission()) }
+            var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(this@MainActivity)) }
+            var hasBluetoothPermission by remember { mutableStateOf(bluetoothMonitor.hasBluetoothPermission()) }
+            var isBatteryOptimizedExempt by remember { mutableStateOf(isBatteryOptimizationExempt()) }
+
+            // Auto-trigger permission onboarding dialog on launch if essential permissions are missing
+            var showPermissionActivationDialog by remember {
+                mutableStateOf(!isNotificationListenerGranted() || !hasPostNotificationPermission())
+            }
+
+            // Observe lifecycle to automatically refresh permission states when returning from Settings
+            DisposableEffect(Unit) {
+                val lifecycleObserver = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        hasNotificationListener = isNotificationListenerGranted()
+                        hasPostNotification = hasPostNotificationPermission()
+                        hasOverlayPermission = Settings.canDrawOverlays(this@MainActivity)
+                        hasBluetoothPermission = bluetoothMonitor.hasBluetoothPermission()
+                        isBatteryOptimizedExempt = isBatteryOptimizationExempt()
+                    }
+                }
+                lifecycle.addObserver(lifecycleObserver)
+                onDispose {
+                    lifecycle.removeObserver(lifecycleObserver)
+                }
+            }
 
             val compatibility = remember { CompatibilityDetector.detectCompatibility() }
             val privacyCapability = remember { privacyMonitor.checkPrivacyCapability() }
@@ -131,6 +172,7 @@ class MainActivity : ComponentActivity() {
                                 shizukuStatus = shizukuStatus,
                                 bluetoothInfo = bluetoothInfo,
                                 activeCards = activeCards,
+                                isListenerActive = hasNotificationListener,
                                 onToggleIsland = { enabled ->
                                     lifecycleScope.launch { preferencesRepo.updateIslandEnabled(enabled) }
                                 },
@@ -138,7 +180,16 @@ class MainActivity : ComponentActivity() {
                                     lifecycleScope.launch { preferencesRepo.updateOverlayFallback(enabled) }
                                 },
                                 onOpenPermissions = {
-                                    navController.navigate(Screen.Permissions.route)
+                                    showPermissionActivationDialog = true
+                                },
+                                onNavigateToBluetooth = {
+                                    navController.navigate(Screen.Bluetooth.route)
+                                },
+                                onNavigateToOtp = {
+                                    navController.navigate(Screen.Otp.route)
+                                },
+                                onNavigateToPrivacy = {
+                                    navController.navigate(Screen.Privacy.route)
                                 }
                             )
                         }
@@ -172,7 +223,7 @@ class MainActivity : ComponentActivity() {
                             BluetoothScreen(
                                 preferences = preferences,
                                 bluetoothInfo = bluetoothInfo,
-                                hasBluetoothPermission = bluetoothMonitor.hasBluetoothPermission(),
+                                hasBluetoothPermission = hasBluetoothPermission,
                                 onToggleBluetoothMonitoring = { enabled ->
                                     lifecycleScope.launch {
                                         preferencesRepo.updateBluetoothMonitoring(enabled)
@@ -228,11 +279,11 @@ class MainActivity : ComponentActivity() {
 
                         composable(Screen.Permissions.route) {
                             PermissionsScreen(
-                                hasNotificationListener = IsleBridgeNotificationListenerService.isConnected,
-                                hasOverlayPermission = Settings.canDrawOverlays(this@MainActivity),
-                                hasPostNotification = hasPostNotificationPermission(),
-                                hasBluetoothPermission = bluetoothMonitor.hasBluetoothPermission(),
-                                isBatteryOptimizedExempt = isBatteryOptimizationExempt(),
+                                hasNotificationListener = hasNotificationListener,
+                                hasOverlayPermission = hasOverlayPermission,
+                                hasPostNotification = hasPostNotification,
+                                hasBluetoothPermission = hasBluetoothPermission,
+                                isBatteryOptimizedExempt = isBatteryOptimizedExempt,
                                 shizukuStatus = shizukuStatus,
                                 onRequestNotificationListener = {
                                     startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -308,6 +359,55 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
+                // First Launch / Missing Permissions Guidance Dialog
+                if (showPermissionActivationDialog) {
+                    PermissionActivationDialog(
+                        hasNotificationListener = hasNotificationListener,
+                        hasPostNotification = hasPostNotification,
+                        hasOverlayPermission = hasOverlayPermission,
+                        hasBluetoothPermission = hasBluetoothPermission,
+                        isBatteryOptimizedExempt = isBatteryOptimizedExempt,
+                        onRequestQuickPermissions = {
+                            val perms = mutableListOf<String>()
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasPostNotification) {
+                                perms.add(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasBluetoothPermission) {
+                                perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+                            }
+                            if (perms.isNotEmpty()) {
+                                requestMultiplePermissionsLauncher.launch(perms.toTypedArray())
+                            }
+                        },
+                        onRequestNotificationListener = {
+                            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        },
+                        onRequestPostNotification = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                        onRequestOverlay = {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName")
+                            )
+                            startActivity(intent)
+                        },
+                        onRequestBluetooth = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                requestBluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                            }
+                        },
+                        onRequestBatteryExemption = {
+                            requestBatteryOptimizationExemption()
+                        },
+                        onDismiss = {
+                            showPermissionActivationDialog = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -359,6 +459,15 @@ class MainActivity : ComponentActivity() {
         }.sortedBy { it.appName.lowercase() }
     }
 
+    private fun isNotificationListenerGranted(): Boolean {
+        return try {
+            val enabledListeners = NotificationManagerCompat.getEnabledListenerPackages(this)
+            enabledListeners.contains(packageName) || IsleBridgeNotificationListenerService.isConnected
+        } catch (_: Exception) {
+            IsleBridgeNotificationListenerService.isConnected
+        }
+    }
+
     private fun hasPostNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -391,4 +500,3 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 }
-

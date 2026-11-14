@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.tuan.islebridge.R

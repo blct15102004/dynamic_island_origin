@@ -10,32 +10,49 @@ IsleBridge tuân thủ nghiêm ngặt các quy định bảo mật:
 
 ---
 
-## 2. Danh sách các quyền hệ thống và cách cấp
+## 2. Quy trình Kích hoạt Quyền Tự động khi Mới Mở App
+
+Khi mở IsleBridge lần đầu tiên (hoặc khi các quyền cốt lõi chưa được cấp), ứng dụng sẽ tự động kích hoạt **Hộp thoại Hướng dẫn Cấp quyền (Permission Activation Modal)**:
+
+1. **Nút "Cấp nhanh quyền hệ thống (1 chạm)":** Tự động gọi hộp thoại hệ thống xin quyền Gửi thông báo (`POST_NOTIFICATIONS`) và Thiết bị Bluetooth ở gần (`BLUETOOTH_CONNECT`).
+2. **Quyền Đọc thông báo (Notification Listener):** Nhấn **Mở cài đặt** để đi thẳng tới màn hình Quản lý quyền thông báo, tìm **IsleBridge** và gạt bật.
+3. **Hiển thị đè lên ứng dụng khác (Overlay):** Cần thiết khi dùng chế độ Đảo nổi (Fallback Mode) trên thiết bị không chạy OriginOS 6/7.
+4. **Bỏ qua tối ưu pin (Doze):** Cho phép dịch vụ duy trì ổn định dưới nền.
+5. **Tự động cập nhật trạng thái:** Ngay khi bạn cấp quyền trong Cài đặt hệ thống và quay lại ứng dụng, giao diện sẽ tự động chuyển sang tích xanh **Đã cấp ✓** ngay lập tức mà không cần khởi động lại app.
+
+Ngoài ra, trên màn hình chính **Tổng quan**, nếu quyền Đọc thông báo chưa được bật, ứng dụng sẽ hiển thị **Banner cảnh báo màu cam/đỏ** với nút **Cấp ngay** để bạn không bao giờ bỏ sót.
+
+---
+
+## 3. Danh sách các quyền hệ thống chi tiết
 
 ### 1. Quyền Truy cập Thông báo (Notification Listener Access)
 - **Mục đích:** Đọc thông báo từ các ứng dụng được người dùng chọn để hiển thị lên Origin Island và trích xuất mã OTP.
 - **Cách cấp:**
-  1. Mở màn hình **Quyền hạn** trong IsleBridge.
+  1. Mở màn hình **Quyền hạn** hoặc hộp thoại kích hoạt trong IsleBridge.
   2. Bấm **Cấp quyền** tại mục *Truy cập thông báo*.
   3. Hệ thống mở trang *Quyền truy cập thông báo* trong Cài đặt Android.
   4. Tìm **IsleBridge** và gạt bật công tắc Cho phép.
 
-### 2. Quyền Thiết bị ở gần (Bluetooth Connect / Scan)
+### 2. Quyền Gửi thông báo (POST_NOTIFICATIONS - Android 13+)
+- **Mục đích:** Cho phép IsleBridge hiển thị thẻ Origin Island và các thông báo trạng thái dưới thanh thông báo.
+- **Cách cấp:** Chọn *Cho phép* trên hộp thoại chuẩn của Android.
+
+### 3. Quyền Thiết bị ở gần (Bluetooth Connect)
 - **Mục đích:** Giám sát tai nghe Bluetooth kết nối và đọc phần trăm pin tai nghe / hộp sạc.
 - **Cách cấp:** Bấm nút cấp quyền trong ứng dụng và chọn *Cho phép* trên hộp thoại chuẩn của Android.
 
-### 3. Quyền Hiển thị đè lên ứng dụng khác (Overlay Permission)
+### 4. Quyền Hiển thị đè lên ứng dụng khác (Overlay Permission)
 - **Mục đích:** Dành cho chế độ Fallback mô phỏng viên thuốc Dynamic Island nổi trên màn hình nếu không sử dụng Origin Island gốc.
 - **Cách cấp:** Bấm *Cấp quyền* tại mục *Hiển thị đè lên ứng dụng khác*, tìm IsleBridge và bật quyền.
 
-### 4. Bỏ qua Tối ưu hóa Pin (Doze Exemption)
+### 5. Bỏ qua Tối ưu hóa Pin (Doze Exemption)
 - **Mục đích:** Giữ cho tiến trình theo dõi thông báo và Bluetooth chạy mượt mà dưới nền mà không bị hệ thống tắt khi tắt màn hình.
 - **Cách cấp:** Chọn *Cấp quyền* tại mục *Bỏ qua tối ưu hóa pin* và chọn *Cho phép*.
 
-### 5. Cấu hình Tự khởi chạy trên vivo / iQOO (OriginOS)
+### 6. Cấu hình Tự khởi chạy trên vivo / iQOO (OriginOS)
 - **Cách thực hiện trên OriginOS:**
   1. Mở ứng dụng **iManager (Quản lý điện thoại)**.
   2. Vào mục **Quản lý quyền (App Manager) > Quản lý tự khởi chạy (Autostart)**.
   3. Tìm **IsleBridge** và bật cho phép tự khởi chạy cùng hệ thống.
   4. Vào **Cài đặt > Pin > Quản lý pin dưới nền > IsleBridge**, chọn **Cho phép sử dụng pin nền cao**.
-
