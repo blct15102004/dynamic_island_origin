@@ -20,8 +20,8 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "GITHUB_OWNER", "\"tuan\"")
-        buildConfigField("String", "GITHUB_REPO", "\"islebridge\"")
+        buildConfigField("String", "GITHUB_OWNER", "\"blct15102004\"")
+        buildConfigField("String", "GITHUB_REPO", "\"dynamic_island_origin\"")
         buildConfigField("String", "EXPECTED_SIGNING_CERT_SHA256", "\"PINNED_CERT_SHA256_PLACEHOLDER\"")
     }
 
