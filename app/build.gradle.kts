@@ -25,8 +25,28 @@ android {
         buildConfigField("String", "EXPECTED_SIGNING_CERT_SHA256", "\"PINNED_CERT_SHA256_PLACEHOLDER\"")
     }
 
+    signingConfigs {
+        create("release") {
+            val envKeystore = System.getenv("ANDROID_KEYSTORE_FILE")
+            val envStorePass = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            val envKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            val envKeyPass = System.getenv("ANDROID_KEY_PASSWORD")
+
+            if (!envKeystore.isNullOrBlank() && file(envKeystore).exists()) {
+                storeFile = file(envKeystore)
+                storePassword = envStorePass
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPass
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

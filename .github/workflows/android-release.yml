@@ -1,0 +1,238 @@
+name: Android CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # Job 1: Development Builds on pushes to 'main'
+  # =========================================================================
+  build-debug:
+    name: Build Debug APK
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Validate Debug APK Output
+        id: validate_debug
+        run: |
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Debug APK was not generated at $APK_PATH"
+            exit 1
+          fi
+          
+          APK_SIZE=$(stat -c%s "$APK_PATH")
+          if [ "$APK_SIZE" -le 0 ]; then
+            echo "::error::Debug APK file size is zero bytes."
+            exit 1
+          fi
+
+          echo "Debug APK successfully built and validated."
+          echo "Path: $APK_PATH"
+          echo "Size: $APK_SIZE bytes"
+          echo "SHA-256: $(sha256sum "$APK_PATH" | awk '{print $1}')"
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: IsleBridge-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # =========================================================================
+  # Job 2: Production Versioned Releases on Git tags (v*)
+  # =========================================================================
+  build-release:
+    name: Build & Publish Release APK
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Release Signing Secrets
+        run: |
+          MISSING_SECRETS=()
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            MISSING_SECRETS+=("ANDROID_KEYSTORE_BASE64")
+          fi
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("ANDROID_KEYSTORE_PASSWORD")
+          fi
+          if [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ]; then
+            MISSING_SECRETS+=("ANDROID_KEY_ALIAS")
+          fi
+          if [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
+            MISSING_SECRETS+=("ANDROID_KEY_PASSWORD")
+          fi
+
+          if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+            echo "::error::Release signing secrets are missing: ${MISSING_SECRETS[*]}"
+            echo "================================================================================"
+            echo "ERROR: Cannot produce a production release without valid signing credentials."
+            echo "To fix this, add the following GitHub Actions Secrets in your repository:"
+            echo "  Repository Settings -> Secrets and variables -> Actions -> New repository secret"
+            echo "  - ANDROID_KEYSTORE_BASE64   (Base64-encoded production .jks / .keystore file)"
+            echo "  - ANDROID_KEYSTORE_PASSWORD (Password protecting the keystore)"
+            echo "  - ANDROID_KEY_ALIAS         (Alias of the signing key)"
+            echo "  - ANDROID_KEY_PASSWORD      (Password for the key alias)"
+            echo ""
+            echo "Refer to GITHUB_APK_RELEASE_GUIDE.md for detailed instructions."
+            echo "================================================================================"
+            exit 1
+          fi
+          echo "All production signing secrets verified."
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Decode Production Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "${{ runner.temp }}/release.keystore"
+          if [ ! -s "${{ runner.temp }}/release.keystore" ]; then
+            echo "::error::Failed to decode keystore or file is empty."
+            exit 1
+          fi
+
+      - name: Build Release APK
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Securely Remove Keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/release.keystore"
+
+      - name: Verify and Package Release Asset
+        id: prepare_asset
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          RAW_APK="app/build/outputs/apk/release/app-release.apk"
+
+          if [ ! -f "$RAW_APK" ]; then
+            echo "::error::Release APK not found at $RAW_APK"
+            exit 1
+          fi
+
+          APK_SIZE=$(stat -c%s "$RAW_APK")
+          if [ "$APK_SIZE" -le 0 ]; then
+            echo "::error::Release APK file size is zero."
+            exit 1
+          fi
+
+          # Verify signature with apksigner if available in Android SDK
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
+            echo "Verifying APK signature using $APKSIGNER..."
+            "$APKSIGNER" verify --verbose "$RAW_APK"
+          else
+            echo "Notice: apksigner not found in default path; skipping binary signature dump."
+          fi
+
+          DEST_DIR="${{ runner.temp }}/release_assets"
+          mkdir -p "$DEST_DIR"
+          RELEASE_APK="$DEST_DIR/IsleBridge-${TAG_NAME}.apk"
+          cp "$RAW_APK" "$RELEASE_APK"
+
+          cd "$DEST_DIR"
+          sha256sum "IsleBridge-${TAG_NAME}.apk" > "IsleBridge-${TAG_NAME}.apk.sha256"
+          SHA256_VAL=$(awk '{print $1}' "IsleBridge-${TAG_NAME}.apk.sha256")
+
+          echo "apk_path=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+          echo "sha_path=$DEST_DIR/IsleBridge-${TAG_NAME}.apk.sha256" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256_VAL" >> "$GITHUB_OUTPUT"
+          echo "apk_size=$APK_SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          DATE=$(date -u +"%Y-%m-%d")
+          PREV_TAG=$(git describe --tags --abbrev=0 "${TAG_NAME}^" 2>/dev/null || echo "")
+
+          cat << 'EOF' > "${{ runner.temp }}/release_notes.md"
+          ## IsleBridge Android Release
+          EOF
+
+          echo "**Version:** \`$TAG_NAME\`" >> "${{ runner.temp }}/release_notes.md"
+          echo "**Release Date:** $DATE" >> "${{ runner.temp }}/release_notes.md"
+          echo "**Application ID:** \`com.tuan.islebridge\`" >> "${{ runner.temp }}/release_notes.md"
+          echo "**File Size:** \`$(( ${{ steps.prepare_asset.outputs.apk_size }} / 1024 / 1024 )) MB\` (${{ steps.prepare_asset.outputs.apk_size }} bytes)" >> "${{ runner.temp }}/release_notes.md"
+          echo "**SHA-256 Checksum:** \`${{ steps.prepare_asset.outputs.sha256 }}\`" >> "${{ runner.temp }}/release_notes.md"
+          echo "" >> "${{ runner.temp }}/release_notes.md"
+          echo "### Changes in this Release" >> "${{ runner.temp }}/release_notes.md"
+
+          if [ -n "$PREV_TAG" ]; then
+            git log "${PREV_TAG}..${TAG_NAME}" --pretty=format:"* %s (%h)" >> "${{ runner.temp }}/release_notes.md"
+          else
+            git log -n 10 --pretty=format:"* %s (%h)" >> "${{ runner.temp }}/release_notes.md"
+          fi
+
+          cat << 'EOF' >> "${{ runner.temp }}/release_notes.md"
+
+          ---
+
+          ### 📲 Installation Instructions for vivo / iQOO (OriginOS)
+          1. Under **Assets** below, tap **`IsleBridge-`**...**`.apk`** to download directly to your phone.
+          2. Open the downloaded file from your browser downloads or Files app.
+          3. When prompted, tap **Settings** and allow **Install unknown apps** for your browser or file manager.
+          4. Tap **Install** (or **Update**).
+          5. Open IsleBridge and complete the built-in permission activation flow (Notification Listener, Bluetooth, etc.).
+
+          > **Update Compatibility Note:** All production releases are signed with the same official key. You can install newer releases directly over existing installations without uninstalling or losing your settings.
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "IsleBridge ${{ github.ref_name }}"
+          body_path: "${{ runner.temp }}/release_notes.md"
+          files: |
+            ${{ steps.prepare_asset.outputs.apk_path }}
+            ${{ steps.prepare_asset.outputs.sha_path }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
