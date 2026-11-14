@@ -29,11 +29,13 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Make Gradle wrapper executable and fix line endings
+        run: |
+          sed -i -e 's/\r$//' gradlew
+          chmod +x gradlew
 
       - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug -x test --no-daemon --stacktrace
 
       - name: Validate and Prepare APK
         id: prepare_apk
