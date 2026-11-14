@@ -29,13 +29,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Make Gradle wrapper executable and fix line endings
+      - name: Make Gradle wrapper executable and accept Android licenses
         run: |
           sed -i -e 's/\r$//' gradlew
           chmod +x gradlew
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Build APK (assembleDebug)
         run: |
@@ -46,9 +44,9 @@ jobs:
         run: |
           APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
-            echo "::error::Gradle build failed to produce APK. Last 120 lines of build log:"
+            echo "::error::Gradle build failed to produce APK. Last 150 lines of build log:"
             echo "========================================================================="
-            tail -n 120 build.log
+            tail -n 150 build.log
             echo "========================================================================="
             exit 1
           fi
