@@ -230,7 +230,7 @@ fun HomeScreen(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Icon(
-                        imageVector = Icons.Default.Pin,
+                        imageVector = Icons.Default.Password,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
