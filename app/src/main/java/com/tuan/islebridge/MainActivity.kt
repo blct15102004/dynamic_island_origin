@@ -122,9 +122,10 @@ class MainActivity : ComponentActivity() {
                         isBatteryOptimizedExempt = isBatteryOptimizationExempt()
                     }
                 }
-                lifecycle.addObserver(lifecycleObserver)
+                val activityLifecycle = this@MainActivity.lifecycle
+                activityLifecycle.addObserver(lifecycleObserver)
                 onDispose {
-                    lifecycle.removeObserver(lifecycleObserver)
+                    activityLifecycle.removeObserver(lifecycleObserver)
                 }
             }
 
