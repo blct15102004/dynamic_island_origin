@@ -29,34 +29,45 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Make Gradle wrapper executable and fix line endings
         run: |
           sed -i -e 's/\r$//' gradlew
           chmod +x gradlew
 
-      - name: Build APK
-        run: ./gradlew assembleDebug -x test --no-daemon --stacktrace
+      - name: Build APK (assembleDebug)
+        run: |
+          ./gradlew assembleDebug -x test --no-daemon --stacktrace 2>&1 | tee build.log
+        continue-on-error: true
 
-      - name: Validate and Prepare APK
-        id: prepare_apk
+      - name: Verify Build Output
         run: |
           APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
-            echo "::error::APK was not found at $APK_PATH"
+            echo "::error::Gradle build failed to produce APK. Last 120 lines of build log:"
+            echo "========================================================================="
+            tail -n 120 build.log
+            echo "========================================================================="
             exit 1
           fi
 
           APK_SIZE=$(stat -c%s "$APK_PATH")
-          echo "APK successfully compiled ($APK_SIZE bytes)"
-          
+          echo "Build successful! APK size: $APK_SIZE bytes"
           mkdir -p release_assets
           cp "$APK_PATH" release_assets/IsleBridge.apk
           cp "$APK_PATH" release_assets/IsleBridge-v1.0.0.apk
-          
-          echo "apk_main=release_assets/IsleBridge.apk" >> "$GITHUB_OUTPUT"
-          echo "apk_versioned=release_assets/IsleBridge-v1.0.0.apk" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK as Artifact
+      - name: Upload Build Log (if failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: IsleBridge-APK
@@ -78,12 +89,12 @@ jobs:
             Bản APK cài đặt trực tiếp cho điện thoại vivo, iQOO (OriginOS 6 / 7) và tất cả các thiết bị Android (Android 8.0+).
             
             #### 📥 Tải về:
-            - Nhấn vào **`IsleBridge.apk`** hoặc **`IsleBridge-v1.0.0.apk`** bên dưới để tải trực tiếp về điện thoại.
+            - Nhấn vào **`IsleBridge.apk`** bên dưới để tải trực tiếp về điện thoại.
             
             #### 🛠 Hướng dẫn cài đặt:
-            1. Mở file vừa tải về từ thông báo hoặc ứng dụng **Tệp (Files)**.
-            2. Nhấn **Cài đặt** (Bật *"Cho phép từ nguồn này"* nếu trình duyệt/máy yêu cầu).
-            3. Mở ứng dụng **IsleBridge** và làm theo hướng dẫn cấp quyền nhanh trên màn hình để bắt đầu dùng Dynamic Island.
+            1. Mở file vừa tải về từ thông báo trình duyệt hoặc ứng dụng **Tệp (Files)**.
+            2. Nhấn **Cài đặt** (Bật *"Cho phép từ nguồn này"* nếu máy hỏi).
+            3. Mở ứng dụng **IsleBridge** và làm theo hướng dẫn cấp quyền nhanh trên màn hình để bắt đầu dùng Dynamic Island!
           draft: false
           prerelease: false
           make_latest: true
