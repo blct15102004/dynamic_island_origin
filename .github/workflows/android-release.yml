@@ -29,11 +29,10 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Make Gradle wrapper executable and accept Android licenses
+      - name: Make Gradle wrapper executable
         run: |
           sed -i -e 's/\r$//' gradlew
           chmod +x gradlew
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Build APK (assembleDebug)
         run: |
@@ -44,10 +43,10 @@ jobs:
         run: |
           APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
           if [ ! -f "$APK_PATH" ]; then
-            echo "::error::Gradle build failed to produce APK. Last 150 lines of build log:"
-            echo "========================================================================="
-            tail -n 150 build.log
-            echo "========================================================================="
+            echo "::error title=Gradle Build Failed::APK not found. Dumping last 80 lines of build.log:"
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done < <(tail -n 80 build.log)
             exit 1
           fi
 
